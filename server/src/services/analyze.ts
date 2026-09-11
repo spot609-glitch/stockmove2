@@ -70,7 +70,7 @@ function fallbackWithoutAi(stock: StockInfo, sources: SourceItem[]): CauseResult
   };
 }
 
-const MODEL = process.env.ANTHROPIC_MODEL?.trim() || "claude-haiku-4-5-20251001";
+const MODEL = process.env.ANTHROPIC_MODEL?.trim() || "claude-haiku-4-5";
 
 async function summarizeWithAi(
   stock: StockInfo,
