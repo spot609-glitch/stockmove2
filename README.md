@@ -11,29 +11,58 @@
 ## 구조
 
 ```
-web/     React + TypeScript 프론트엔드 (Vite)
-server/  Express + TypeScript 백엔드 (가격/공시/뉴스 조회 프록시)
+web/         React + TypeScript 프론트엔드 (Vite)
+server/src/  Express + TypeScript API (가격/공시/뉴스 조회 프록시)
+  app.ts       cors+json+/api 라우터만 있는 순수 Express 앱 (정적 서빙, listen() 없음)
+  index.ts     로컬/자체 호스팅용 진입점 — app.ts에 정적 파일 서빙과 listen() 추가
+api/index.ts  Vercel Serverless Function 진입점 — app.ts를 그대로 export
 ```
 
 백엔드가 필요한 이유: 종목 시세, DART 공시, 뉴스 검색 API는 브라우저에서 직접
 호출 시 CORS로 막히거나 API 키가 노출되므로, 서버가 대신 호출해 프론트엔드에
 전달합니다. 서버는 사용자 데이터를 저장하지 않는 단순 프록시입니다(DB 없음).
 
-## 실행 방법
+`app.ts`가 정적 파일 서빙/listen()과 분리되어 있는 이유는 Vercel 배포 때문입니다
+(아래 "Vercel 배포" 참고).
+
+## 로컬 실행
 
 ```bash
-npm run install:all   # server, web 의존성 설치
-npm run dev            # server(4000) + web(5173) 동시 실행
+npm install    # workspaces(server, web) 의존성을 루트에서 한 번에 설치
+npm run dev    # server(4000) + web(5173) 동시 실행
 ```
 
 브라우저에서 http://localhost:5173 접속 (API 요청은 Vite 프록시를 통해 서버로 전달됩니다).
 
-운영 배포 시에는:
+자체 서버(Render, Railway, VM 등)에 배포할 때는:
 
 ```bash
-npm run build   # 프론트엔드 빌드 (web/dist)
-npm start        # server가 web/dist를 함께 서빙 (포트 4000)
+npm run build   # 프론트엔드(web/dist) + 서버(server/dist) 빌드
+npm start        # server가 web/dist를 함께 서빙 (포트 4000, PORT 환경변수로 변경 가능)
 ```
+
+## Vercel 배포
+
+이 저장소에는 Vercel용 `vercel.json`이 포함되어 있습니다. Vercel에 이 저장소를
+그대로 연결(Import)하면 별도 설정 없이 아래처럼 동작합니다.
+
+- **정적 프론트엔드**: `npm run vercel-build`(=`web`만 빌드)로 만든 `web/dist`를
+  Vercel이 CDN에서 정적으로 서빙합니다. Express는 여기에 관여하지 않습니다.
+- **API**: `api/index.ts`가 Express 앱(`server/src/app.ts`)을 그대로 export하는
+  Serverless Function입니다. `vercel.json`의 rewrite 규칙(`/api/(.*) → /api`)이
+  `/api/search`, `/api/quotes`, `/api/analyze` 등 모든 하위 경로 요청을 이 함수로
+  보내고, Express가 원래 경로(`req.url`)를 보고 알아서 라우팅합니다.
+- **함수 실행 시간**: `/api/analyze`는 종목마다 공시·뉴스·커뮤니티를 순차/병렬로
+  조회하고 선택적으로 AI 요약까지 호출하므로 수 초가 걸릴 수 있습니다.
+  `vercel.json`에서 `maxDuration: 60`으로 설정해 두었지만, 플랜에 따라 실제
+  허용 시간이 다를 수 있으니(Hobby/Pro 제한) 급등락 종목이 많을 경우 타임아웃이
+  발생할 수 있습니다. 필요하면 플랜을 확인하거나 배치 크기를 줄여주세요.
+
+**Vercel 프로젝트 설정 시 확인할 것**
+- Framework Preset: "Other"(또는 자동 감지된 설정을 `vercel.json` 값으로 덮어써도 무방)
+- Environment Variables: 아래 "환경변수" 표의 키를 Vercel 대시보드 → Settings →
+  Environment Variables에 등록 (Production/Preview 모두)
+- Root Directory: 저장소 루트 그대로 사용 (하위 폴더로 지정하지 않기)
 
 ## 환경변수 (선택)
 

@@ -1,16 +1,15 @@
 import "dotenv/config";
 import express from "express";
-import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { apiRouter } from "./routes/api.js";
+import app from "./app.js";
 
+/**
+ * Local dev / non-Vercel deployment entrypoint (Render, Railway, a VM, `npm run dev`, ...).
+ * On Vercel this file is never used — api/index.ts imports app.ts directly and
+ * the frontend is served as a static site instead.
+ */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-app.use("/api", apiRouter);
 
 const webDist = path.resolve(__dirname, "../../web/dist");
 app.use(express.static(webDist));
